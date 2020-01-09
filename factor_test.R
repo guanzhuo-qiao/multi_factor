@@ -40,7 +40,6 @@ data_cleaner <- function(data_set){
 }
 
 features = data_cleaner(features)
-label_table = label_table[,-1,] # convert to 2d and exclude first data to match the feature's data set
 
 data_orthogonal <- function(data_set){
   for(i in 1:dim(data_set)[2]){
@@ -62,9 +61,9 @@ features = data_orthogonal(features)
 
 get_sum_factor <- function(label_data,feature_data,looking_back){
   # looking_back: control the rolling back period of ICIR
-  # exclude the first column due to the lag of features' data
+  # exclude the first column due to the lack of features' data
   # exclude the second on due to the need of lag 1 period data
-  lag_label_data = label_data[,c(-1,-2)] # 2d table
+  lag_label_data = label_data[,c(-1,-2),] # 2d table
   lag_feature_data = feature_data[,1:dim(feature_data)[2]-1,]
   cor_table = array(dim=c(dim(lag_feature_data)[2],dim(lag_feature_data)[3])) # row: time; column: factors
   for(layer in 1:dim(lag_feature_data)[2]){
@@ -88,7 +87,7 @@ new_features = get_sum_factor(label_table,features,looking_back_period)
 
 # select the stocks subject to new factors
 
-bt_label_data = label_table[,-1:-(looking_back_period+1)] # the feature use looking back period and 1 future return to get.
+bt_label_data = label_table[,-1:-(looking_back_period+1+1),] # the feature use looking back period and 1 future return to get.
 bt_features = new_features[,-dim(new_features)[2]] #the last data can't be tested due to outrage of the time period
 
 get_stock_weight <- function(factor_return_table,type_){
@@ -124,7 +123,9 @@ get_quantile_portfolios <- function(sortable_features,quantile_num){
 }
 
 portfolio_basket = get_quantile_portfolios(bt_features,quantile_num=4)
-
+save(portfolio_basket,file="portfolio_basket.rda")
+save(bt_label_data,file="bt_label_data.rda")
+save(bt_features,file="bt_features.rda")
 
 
 
