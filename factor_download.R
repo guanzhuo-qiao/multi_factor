@@ -1,12 +1,9 @@
 library(quantmod)
 library(TTR)
-#getSymbols("AAPL",from = "2017-01-01",to = "2020-01-03",src = "yahoo")
+#getSymbols("AAPL",from = "2017-01-01",to = "2020-01-01",src = "yahoo")
 #holistic_data = AAPL
 #setwd("~/Desktop")
 
-back_test <- function(stck_weights,stck_returns){
-  prod(diag(stck_weights %*% t(stck_returns)))
-}
 
 get_factor <- function(one_month_data){
   # here we get some inner monthly factor
@@ -41,7 +38,7 @@ get_devfactor <- function(whole_data, N_ema_fast, N_ema_slow)
   cmf = TTR::CMF(whole_data[,2:4],whole_data[,5])
   rsi = TTR::RSI(whole_data[,6])
   
-  results = xts(matrix(c(ppo,pvo,wr,ad,so,macd,bb,cmf,rsi),ncol=9),order.by = index(whole_data))
+  results = xts(matrix(c(ppo,pvo,wr,clv,ad,so,macd,bb,cmf,rsi),ncol=10),order.by = index(whole_data))
   results
 }
 
@@ -67,15 +64,15 @@ get_return <- function(one_month_data){
 stock_list = c("KO","CAT","JPM","NKE","MMM","TRV","JNJ","PFE","PG","IBM","WMT","UTX","VZ","V",
 "MSFT","INTC","BA","CVX","CSCO","MRK","AXP","HD","DIS","UNH","XOM","AAPL","WBA","GS","MCD")
 
-features <- array(dim=c(length(stock_list),37,9))
-label_table <- array(dim=c(length(stock_list),37,1))
+features <- array(dim=c(length(stock_list),36,10))# stocks number; months number; features number
+label_table <- array(dim=c(length(stock_list),36,1))
 count = 0
 for(stock_symbols in stock_list){
   count = count+1
-  raw_data <- getSymbols(stock_symbols,from="2017-01-01",to="2020-01-03",src="yahoo",auto.assign=FALSE)
+  raw_data <- getSymbols(stock_symbols,from="2017-01-01",to="2020-01-01",src="yahoo",auto.assign=FALSE)
   monthly_data <- split.xts(raw_data,f="months")
   factor_data = split.xts(get_devfactor(raw_data,12,26),f="months")
-  monthly_factor = matrix(unlist(lapply(factor_data,get_month_devfactor)),ncol=9,byrow = T)
+  monthly_factor = matrix(unlist(lapply(factor_data,get_month_devfactor)),ncol=10,byrow = T)
   features[count,,] = monthly_factor
   label_table[count,,] = c(unlist(lapply(monthly_data,get_return)))
   print(stock_symbols)
