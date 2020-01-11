@@ -1,5 +1,6 @@
 library(quantmod)
 library(TTR)
+library(Rglpk)
 
 load("factor_table.rda")
 load("label_table.rda")
@@ -69,6 +70,7 @@ get_sum_factor <- function(label_data,feature_data,looking_back){
   for(layer in 1:dim(lag_feature_data)[2]){
     cc = apply(X=lag_feature_data[,layer,],MARGIN = 2,FUN=cor,y=lag_label_data[,layer],method="spearman")
     cor_table[layer,] = cc
+    #print(layer)
   }
   ir_table = rollapply(data=cor_table,width=looking_back,FUN=mean)/rollapply(data=cor_table,width=looking_back,FUN=sd)
   #weighted sum
@@ -92,11 +94,23 @@ bt_features = new_features[,-dim(new_features)[2]] #the last data can't be teste
 
 get_stock_weight <- function(factor_return_table,type_){
   # according to tf securities
-  if(type_=="tf"){
+  if(type_=="linear"){
     # optimizer here
+    # max r'w
+    #  s.t. 0<= w <= 0.4
+    #       sum(w)==1
+    obj <- factor_return_table
+    mat <- matrix(rep(1,length(factor_return_table)),nrow=1)
+    dir <- c("==")
+    rhs <- c(1)
+    max <- TRUE
+    bounds <- list(lower = list(ind = 1:length(factor_return_table), val = rep(0,length(factor_return_table))),
+                   upper = list(ind = 1:length(factor_return_table), val = rep(0.4,length(factor_return_table))))
+    res = Rglpk_solve_LP(obj, mat, dir, rhs, bounds, max = max)
+    return(res$solution)
   }
   if(type_=="equal"){
-    rep(1/length(factor_return_table),length(factor_return_table))
+    return(rep(1/length(factor_return_table),length(factor_return_table)))
   }
 }
 
@@ -123,6 +137,14 @@ get_quantile_portfolios <- function(sortable_features,quantile_num){
 }
 
 portfolio_basket = get_quantile_portfolios(bt_features,quantile_num=4)
+
+
+
+
+
+
+
+
 save(portfolio_basket,file="portfolio_basket.rda")
 save(bt_label_data,file="bt_label_data.rda")
 save(bt_features,file="bt_features.rda")
