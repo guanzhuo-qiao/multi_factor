@@ -89,7 +89,7 @@ new_features = get_sum_factor(label_table,features,looking_back_period)
 
 # select the stocks subject to new factors
 
-bt_label_data = label_table[,-1:-(looking_back_period+1+1),] # the feature use looking back period and 1 future return to get.
+bt_label_data = label_table[,-1:-(looking_back_period+1+1),] # the feature use looking back period and 1 future return to get.another 1 due to nan
 bt_features = new_features[,-dim(new_features)[2]] #the last data can't be tested due to outrage of the time period
 
 get_stock_weight <- function(factor_return_table,type_){
@@ -139,6 +139,76 @@ get_quantile_portfolios <- function(sortable_features,quantile_num){
 portfolio_basket = get_quantile_portfolios(bt_features,quantile_num=4)
 
 
+####################################################################################
+####################################################################################
+
+
+optimizer <- function(fator_return_table,w_b,threshold,l){
+  # fator_return_table:1D array
+  # w_b:1d array
+  # threshhold: number
+  # l: number
+  # max r'w
+  #  s.t. 0<= w <= 0.4
+  #       sum(w)==1
+  #       wb-threshold<=w<=wb+threshold
+  obj <- factor_return_table
+  mat <- matrix(rep(1,length(factor_return_table)),nrow=1)
+  dir <- c("==")
+  rhs <- c(1)
+  max <- TRUE
+  bounds <- list(lower = list(ind = 1:length(factor_return_table), val = apply(wb-threshold,MARGIN=1,FUN = max,0)),
+                 upper = list(ind = 1:length(factor_return_table), val = apply(wb+threshold,MARGIN=1,FUN = min,l)))
+  res = Rglpk_solve_LP(obj, mat, dir, rhs, bounds, max = max)
+  return(res$solution)
+  
+}
+
+get_te <- function(benchmark_return,portfolio_return,te_time){
+  diff_return = portfolio_return-benchmark_return
+  vol = sd(diff_return)
+  res = vol*sqrt(12/te_time)
+  return(res)
+}
+
+back_test <- function(stck_weights,stck_returns){# time;stocks
+  cumprod(1+diag(stck_weights %*% t(stck_returns)))
+  #plot(c(1:dim(stck_weights)[1]),cumprod(1+diag(stck_weights %*% t(stck_returns))),type = "l")
+}
+
+get_stock_weight_tfAdaptive <- function(constrain, te_target, bench_return, bench_weight, factor_return, label_data, look_back){
+  #bench_return: 1d array
+  #factor_return: 2d matrix stock;time
+  #label_data: 2d matrix stock;time
+  weight_result_table = array(dim=c(dim(factor_return)[1],dim(factor_return)[2]-look_back+1))
+  for(start in look_back:dim(factor_return)[2]){
+    window_factor_return = factor_return[,start-look_back+1:start]
+    window_label_data = label_data[,start-look_back+1:start]
+    window_bench_return = bench_return[start-look_back+1:start]
+    window_bench_weight = bench_weight[,start-look_back+1:start]
+    for(i in 1:lenth(constrain)){
+      cons = constrain[i]
+      weight_res = array(dim=c(dim(factor_return)[1],look_back))# stock;time
+      for(time_ in 1:look_back){
+        weight_res[,time_] = optimizer(window_factor_return[,time_],window_bench_weight[,time_],threshold = cons,l=0.04)
+      }
+      potfolio_return = back_test(stck_weights = t(weight_res),stck_returns = t(window_label_data))
+      get_te(window_bench_return,potfolio_return,look_back)
+      if(get_te>te_target){
+        if(i==1){
+          weight_result_table[,start]=weight_res[,look_back]
+        }else{
+          weight_result_table[,start]=weight_result
+        }
+        break
+      }else{
+        weight_result = weight_res[,look_back]
+        if(i==length(constrain)){weight_result_table[,start]=weight_result}
+      }
+    }
+  }
+  return(weight_result_table)
+}
 
 
 
