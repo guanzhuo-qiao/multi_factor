@@ -81,5 +81,16 @@ save(features,file="factor_table.rda")
 save(label_table,file="label_table.rda")
 save(stock_list,file="stock_list.rda")
 
+dji = getSymbols("^DJI",from = "2017-01-01",to = "2020-01-01",src = "yahoo",auto.assign=FALSE)
+
+get_return <- function(one_month_data){
+  month_close = coredata(last(one_month_data)[,6])
+  month_open = coredata(first(one_month_data)[,6])
+  month_return = month_close/month_open-1
+  month_return
+}
+monthly_data = split.xts(dji,f="months")
+benchmark_label = c(unlist(lapply(monthly_data,get_return)))
+save(benchmark_label,file="benchmark_label.rda")
 
 

@@ -143,8 +143,8 @@ portfolio_basket = get_quantile_portfolios(bt_features,quantile_num=4)
 ####################################################################################
 
 
-optimizer <- function(fator_return_table,w_b,threshold,l){
-  # fator_return_table:1D array
+optimizer <- function(factor_return_table,w_b,threshold,l){
+  # factor_return_table:1D array
   # w_b:1d array
   # threshhold: number
   # l: number
@@ -152,16 +152,16 @@ optimizer <- function(fator_return_table,w_b,threshold,l){
   #  s.t. 0<= w <= 0.4
   #       sum(w)==1
   #       wb-threshold<=w<=wb+threshold
+  w_b = array(w_b)
   obj <- factor_return_table
   mat <- matrix(rep(1,length(factor_return_table)),nrow=1)
   dir <- c("==")
   rhs <- c(1)
   max <- TRUE
-  bounds <- list(lower = list(ind = 1:length(factor_return_table), val = apply(wb-threshold,MARGIN=1,FUN = max,0)),
-                 upper = list(ind = 1:length(factor_return_table), val = apply(wb+threshold,MARGIN=1,FUN = min,l)))
+  bounds <- list(lower = list(ind = 1:length(factor_return_table), val = apply(w_b-threshold,MARGIN=1,FUN = max,0)),
+                 upper = list(ind = 1:length(factor_return_table), val = apply(w_b+threshold,MARGIN=1,FUN = min,l)))
   res = Rglpk_solve_LP(obj, mat, dir, rhs, bounds, max = max)
   return(res$solution)
-  
 }
 
 get_te <- function(benchmark_return,portfolio_return,te_time){
@@ -182,35 +182,37 @@ get_stock_weight_tfAdaptive <- function(constrain, te_target, bench_return, benc
   #label_data: 2d matrix stock;time
   weight_result_table = array(dim=c(dim(factor_return)[1],dim(factor_return)[2]-look_back+1))
   for(start in look_back:dim(factor_return)[2]){
-    window_factor_return = factor_return[,start-look_back+1:start]
-    window_label_data = label_data[,start-look_back+1:start]
-    window_bench_return = bench_return[start-look_back+1:start]
-    window_bench_weight = bench_weight[,start-look_back+1:start]
-    for(i in 1:lenth(constrain)){
+    window_factor_return = factor_return[,(start-look_back+1):start]
+    window_label_data = label_data[,(start-look_back+1):start]
+    window_bench_return = bench_return[(start-look_back+1):start]
+    window_bench_weight = bench_weight[,(start-look_back+1):start]
+    for(i in 1:length(constrain)){
       cons = constrain[i]
       weight_res = array(dim=c(dim(factor_return)[1],look_back))# stock;time
       for(time_ in 1:look_back){
-        weight_res[,time_] = optimizer(window_factor_return[,time_],window_bench_weight[,time_],threshold = cons,l=0.04)
+        weight_res[,time_] = optimizer(window_factor_return[,time_],window_bench_weight[,time_],threshold = cons,l=0.5)
       }
       potfolio_return = back_test(stck_weights = t(weight_res),stck_returns = t(window_label_data))
-      get_te(window_bench_return,potfolio_return,look_back)
-      if(get_te>te_target){
+      te = get_te(window_bench_return,potfolio_return,look_back)
+      if(te>te_target){
         if(i==1){
-          weight_result_table[,start]=weight_res[,look_back]
+          weight_result_table[,(start-look_back+1)]=weight_res[,look_back]
         }else{
-          weight_result_table[,start]=weight_result
+          weight_result_table[,(start-look_back+1)]=weight_result
         }
         break
       }else{
         weight_result = weight_res[,look_back]
-        if(i==length(constrain)){weight_result_table[,start]=weight_result}
+        if(i==length(constrain)){weight_result_table[,(start-look_back+1)]=weight_result}
       }
     }
   }
   return(weight_result_table)
 }
 
-
+bench_return = benchmark_label[-1:-(looking_back_period+1+1)]
+bench_weight = array(runif(29*29,min=0,max=0.1),dim=c(29,29))
+get_stock_weight_tfAdaptive(c(0.01,0.02,0.03,0.04,0.05),0.1,bench_return,bench_weight,bt_features,bt_label_data,3)
 
 
 
