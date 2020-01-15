@@ -15,7 +15,7 @@ get_te <- function(benchmark_return,portfolio_return,te_time){
 load("portfolio_basket.rda")
 load("bt_label_data.rda")
 load("bt_features.rda")
-
+load("benchmark_label.rda")
 # download benchmark
 looking_back_period = 5
 benchmark_label = benchmark_label[-1:-(looking_back_period+1+1)]
